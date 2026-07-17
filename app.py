@@ -3,22 +3,22 @@ House Interior Generator
 -------------------------
 A Streamlit app that lets a user pick interior customization options
 (door material/color, wall texture/color, bedroom style/color, room type)
-from dropdowns, then uses the Hugging Face Inference API to render a
+from dropdowns, then uses the OpenRouter API to render a
 photorealistic preview of that interior.
 
 Run locally:
     pip install -r requirements.txt
-    export HF_API_TOKEN="hf_..."      (or put it in .streamlit/secrets.toml)
+    export OPENROUTER_API_KEY="sk-or-..."      (or put it in .streamlit/secrets.toml)
     streamlit run app.py
 """
 
+import base64
 import io
 import os
 from datetime import datetime
 
+import requests
 import streamlit as st
-from huggingface_hub import InferenceClient
-from huggingface_hub.errors import HfHubHTTPError
 
 
 # ----------------------------------------------------------------------
@@ -289,43 +289,75 @@ def build_prompt(room, door_material, door_color, wall_texture, wall_color,
 
 
 # ----------------------------------------------------------------------
-# Image generation
+# Image generation — via OpenRouter's chat completions endpoint
 # ----------------------------------------------------------------------
-# NOTE: Hugging Face retired the old "api-inference.huggingface.co" URL in
-# favor of its newer "Inference Providers" routing. Rather than hard-code a
-# provider URL (which can change again), we use Hugging Face's own official
-# huggingface_hub client — it always talks to the current routing endpoint.
-HF_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
+# OpenRouter doesn't expose a separate "images/generations" endpoint.
+# Image-capable models are called through the normal chat completions
+# endpoint with `modalities: ["image", "text"]`, and the generated image
+# comes back as a base64 data URL inside
+# choices[0].message.images[0].image_url.url
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.5-flash-image")
 
 
-def _get_hf_token():
-    return os.environ.get("HF_API_TOKEN") or st.secrets.get("HF_API_TOKEN", None)
+def _get_openrouter_key():
+    return os.environ.get("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY", None)
 
 
 def generate_image(prompt: str):
-    api_key = _get_hf_token()
+    api_key = _get_openrouter_key()
     if not api_key:
         raise RuntimeError(
-            "No Hugging Face API token found. Set the HF_API_TOKEN environment variable, "
-            "or add HF_API_TOKEN to .streamlit/secrets.toml."
+            "No OpenRouter API key found. Set the OPENROUTER_API_KEY environment variable, "
+            "or add OPENROUTER_API_KEY to .streamlit/secrets.toml. "
+            "You can create a key at https://openrouter.ai/keys."
         )
 
-    client = InferenceClient(api_key=api_key)
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        # Optional but recommended by OpenRouter for attribution/rankings.
+        "HTTP-Referer": "https://streamlit.io",
+        "X-Title": "House Interior Generator",
+    }
+    payload = {
+        "model": OPENROUTER_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "modalities": ["image", "text"],
+    }
 
     try:
-        image = client.text_to_image(prompt, model=HF_MODEL)
-    except HfHubHTTPError as e:
-        raise RuntimeError(
-            f"Hugging Face rejected the request: {e}. "
-            "This can happen if the model needs a specific provider, or if your "
-            "account doesn't have access to it — try a different model in HF_MODEL."
-        ) from e
-    except Exception as e:
-        raise RuntimeError(f"Couldn't reach Hugging Face: {e}") from e
+        response = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=120)
+    except requests.RequestException as e:
+        raise RuntimeError(f"Couldn't reach OpenRouter: {e}") from e
 
-    buf = io.BytesIO()
-    image.save(buf, format="PNG")
-    return buf.getvalue()
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"OpenRouter rejected the request (HTTP {response.status_code}): {response.text}. "
+            f"This can happen if the model '{OPENROUTER_MODEL}' doesn't support image output, "
+            "or your OpenRouter account/key doesn't have access to it — try a different model "
+            "via the OPENROUTER_MODEL environment variable."
+        )
+
+    data = response.json()
+    choices = data.get("choices", [])
+    if not choices:
+        raise RuntimeError(f"OpenRouter returned no choices: {data}")
+
+    message = choices[0].get("message", {})
+    images = message.get("images", [])
+    if not images:
+        raise RuntimeError(
+            "OpenRouter didn't return an image. The model may only support text output, "
+            f"or the request was filtered. Raw response: {data}"
+        )
+
+    image_url = images[0].get("image_url", {}).get("url", "")
+    if not image_url.startswith("data:image"):
+        raise RuntimeError(f"Unexpected image format returned by OpenRouter: {image_url[:80]}...")
+
+    b64_data = image_url.split(",", 1)[1]
+    return base64.b64decode(b64_data)
 
 
 # ----------------------------------------------------------------------
