@@ -13,12 +13,11 @@ Run locally:
 """
 
 import os
-import base64
-import io
+import time
 from datetime import datetime
 
+import requests
 import streamlit as st
-from openai import OpenAI
 
 
 # ----------------------------------------------------------------------
@@ -129,22 +128,37 @@ def build_prompt(room, door_material, door_color, wall_texture, wall_color,
 # ----------------------------------------------------------------------
 # Image generation
 # ----------------------------------------------------------------------
-def generate_image(prompt: str):
-    api_key = os.environ.get("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", None)
+HF_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
+HF_API_URL = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
+
+
+def generate_image(prompt: str, max_wait_seconds: int = 60):
+    api_key = os.environ.get("HF_API_TOKEN") or st.secrets.get("HF_API_TOKEN", None)
     if not api_key:
         raise RuntimeError(
-            "No OpenAI API key found. Set the OPENAI_API_KEY environment variable, "
-            "or add OPENAI_API_KEY to .streamlit/secrets.toml."
+            "No Hugging Face API token found. Set the HF_API_TOKEN environment variable, "
+            "or add HF_API_TOKEN to .streamlit/secrets.toml."
         )
-    client = OpenAI(api_key=api_key)
-    result = client.images.generate(
-        model="gpt-image-1",
-        prompt=prompt,
-        size="1024x1024",
-        n=1,
-    )
-    b64_data = result.data[0].b64_json
-    return base64.b64decode(b64_data)
+    headers = {"Authorization": f"Bearer {api_key}"}
+    payload = {"inputs": prompt, "options": {"wait_for_model": True}}
+
+    waited = 0
+    while True:
+        response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=120)
+
+        if response.status_code == 200 and response.headers.get("content-type", "").startswith("image"):
+            return response.content
+
+        # Model still loading on Hugging Face's side — wait and retry a few times.
+        if response.status_code == 503 and waited < max_wait_seconds:
+            wait_for = 5
+            time.sleep(wait_for)
+            waited += wait_for
+            continue
+
+        raise RuntimeError(
+            f"Hugging Face API error ({response.status_code}): {response.text[:300]}"
+        )
 
 
 # ----------------------------------------------------------------------
