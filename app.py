@@ -301,7 +301,16 @@ OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.5-flash-i
 
 
 def _get_openrouter_key():
-    return os.environ.get("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY", None)
+    key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    if key:
+        return key
+    # st.secrets raises if no secrets.toml exists at all — don't let that
+    # crash the app, just treat it as "no key found there either".
+    try:
+        key = str(st.secrets.get("OPENROUTER_API_KEY", "") or "").strip()
+    except Exception:
+        key = ""
+    return key or None
 
 
 def generate_image(prompt: str):
@@ -314,7 +323,7 @@ def generate_image(prompt: str):
         )
 
     headers = {
-        "Authorization": f"Bearer {api_key}",
+        "Authorization": f"Bearer {api_key.strip()}",
         "Content-Type": "application/json",
         # Optional but recommended by OpenRouter for attribution/rankings.
         "HTTP-Referer": "https://streamlit.io",
@@ -382,6 +391,28 @@ hero_html = (
     '</div>'
 )
 st.markdown(hero_html, unsafe_allow_html=True)
+
+# ----------------------------------------------------------------------
+# Small diagnostic so it's obvious whether an OpenRouter key was found
+# and where it came from — helps debug "Missing Authentication header"
+# style errors without ever printing the real key.
+# ----------------------------------------------------------------------
+with st.sidebar:
+    st.caption("OpenRouter connection")
+    _env_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    try:
+        _secrets_key = str(st.secrets.get("OPENROUTER_API_KEY", "") or "").strip()
+    except Exception:
+        _secrets_key = ""
+    if _env_key:
+        st.success(f"Key loaded from environment variable (ends in ...{_env_key[-4:]})")
+    elif _secrets_key:
+        st.success(f"Key loaded from secrets.toml (ends in ...{_secrets_key[-4:]})")
+    else:
+        st.warning(
+            "No OPENROUTER_API_KEY found in the environment or "
+            ".streamlit/secrets.toml. Set it before generating an image."
+        )
 
 
 def section_pill(text, tone="lilac"):
