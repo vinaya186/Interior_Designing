@@ -22,109 +22,198 @@ from huggingface_hub.errors import HfHubHTTPError
 
 
 # ----------------------------------------------------------------------
-# Page setup + styling
+# Page setup
 # ----------------------------------------------------------------------
 st.set_page_config(
     page_title="House Interior Generator",
-    page_icon="🏠",
+    page_icon="📐",
     layout="wide",
 )
 
-TEXT_DARK = "#2b2420"
-TEXT_MUTED = "#6b5f52"
-ACCENT = "#a9744f"
-ACCENT_DARK = "#8c5f3e"
-CARD_BG = "#ffffff"
-CARD_BORDER = "#e9e1d4"
-PAGE_BG_TOP = "#faf7f2"
-PAGE_BG_BOTTOM = "#f3ede3"
+# ----------------------------------------------------------------------
+# Design tokens — an architectural "spec sheet" identity: a blueprint-navy
+# hero with a faint drafting grid, crisp paper cards with corner tick marks
+# (like a detail callout on a drawing), and a cyan highlight pulled from
+# blueprint linework rather than a generic accent color.
+# ----------------------------------------------------------------------
+NAVY = "#0f2a45"
+BLUEPRINT_LINE = "#6fa3c4"
+PAPER = "#f6f5f0"
+INK = "#16212b"
+SIGNAL = "#0e94a3"
+MUTED = "#5c6b75"
+
+# Reusable corner-tick "detail callout" marks, drawn with layered
+# background-gradients so no extra markup is needed on the element.
+CORNER_TICKS = f"""
+    background-image:
+        linear-gradient({INK}, {INK}), linear-gradient({INK}, {INK}),
+        linear-gradient({INK}, {INK}), linear-gradient({INK}, {INK}),
+        linear-gradient({INK}, {INK}), linear-gradient({INK}, {INK}),
+        linear-gradient({INK}, {INK}), linear-gradient({INK}, {INK});
+    background-repeat: no-repeat;
+    background-size:
+        16px 2px, 2px 16px,
+        16px 2px, 2px 16px,
+        16px 2px, 2px 16px,
+        16px 2px, 2px 16px;
+    background-position:
+        10px 10px, 10px 10px,
+        calc(100% - 26px) 10px, calc(100% - 12px) 10px,
+        calc(100% - 26px) calc(100% - 12px), calc(100% - 12px) calc(100% - 26px),
+        10px calc(100% - 12px), 10px calc(100% - 26px);
+"""
 
 CUSTOM_CSS = f"""
 <style>
-    /* Force a consistent palette regardless of the viewer's light/dark
-       system setting — Streamlit's theme otherwise leaves headers and
-       labels an unreadable pale color on a light card background. */
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+
     .stApp {{
-        background: linear-gradient(180deg, {PAGE_BG_TOP} 0%, {PAGE_BG_BOTTOM} 100%);
+        background-color: {PAPER};
     }}
     .stApp, .stApp p, .stApp span, .stApp label, .stApp li {{
-        color: {TEXT_DARK};
+        color: {INK};
+        font-family: 'Inter', sans-serif;
     }}
     h1, h2, h3, h4 {{
-        font-family: 'Georgia', serif;
-        color: {TEXT_DARK} !important;
+        font-family: 'Space Grotesk', sans-serif;
+        color: {INK} !important;
     }}
-    .hero {{
+
+    /* ---- Hero band ---- */
+    .hero-band {{
+        background-color: {NAVY};
+        background-image:
+            linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px);
+        background-size: 26px 26px;
+        border-radius: 6px;
+        padding: 2.2rem 2.5rem;
+        margin-bottom: 1.8rem;
         display: flex;
         align-items: center;
-        gap: 0.6rem;
-        margin-bottom: 0.2rem;
+        justify-content: space-between;
+        gap: 1.5rem;
+        flex-wrap: wrap;
     }}
-    .hero-emoji {{
-        font-size: 2.4rem;
+    .hero-left {{
+        display: flex;
+        align-items: center;
+        gap: 1rem;
     }}
-    .subtitle {{
-        color: {TEXT_MUTED};
-        font-size: 1.05rem;
-        margin-bottom: 1.5rem;
-    }}
-    .section-label {{
+    .hero-title {{
+        font-family: 'Space Grotesk', sans-serif;
         font-weight: 700;
-        color: {ACCENT_DARK};
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        font-size: 0.8rem;
-        margin: 1.1rem 0 0.3rem 0;
+        font-size: 2rem;
+        color: #f6f5f0 !important;
+        margin: 0;
+        line-height: 1.1;
     }}
+    .hero-sub {{
+        color: {BLUEPRINT_LINE};
+        font-size: 0.95rem;
+        margin: 0.35rem 0 0 0;
+    }}
+    .hero-scale {{
+        font-family: 'JetBrains Mono', monospace;
+        color: {BLUEPRINT_LINE};
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        text-align: right;
+        white-space: nowrap;
+    }}
+
+    /* ---- Section eyebrows inside the spec sheet ---- */
+    .section-label {{
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 600;
+        color: {SIGNAL};
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.75rem;
+        margin: 1.3rem 0 0.5rem 0;
+        padding-bottom: 0.35rem;
+        border-bottom: 1px dashed {BLUEPRINT_LINE};
+    }}
+    .section-label:first-of-type {{
+        margin-top: 0;
+    }}
+
+    /* ---- Spec sheet (form) card ---- */
     div[data-testid="stForm"] {{
-        background: {CARD_BG};
-        padding: 1.75rem 2rem;
-        border-radius: 16px;
-        box-shadow: 0 4px 18px rgba(0,0,0,0.06);
-        border: 1px solid {CARD_BORDER};
+        background: {PAPER};
+        padding: 1.9rem 2rem 1.5rem 2rem;
+        border-radius: 2px;
+        border: 1.5px solid {INK};
+        {CORNER_TICKS}
     }}
     div[data-testid="stForm"] label p {{
-        color: {TEXT_DARK} !important;
+        color: {MUTED} !important;
         font-weight: 600;
+        font-size: 0.85rem;
     }}
+
+    /* ---- Preview card (native Streamlit container via key=) ---- */
+    div[class*="st-key-preview_card"] {{
+        background: {PAPER};
+        padding: 1.5rem;
+        border-radius: 2px;
+        border: 1.5px solid {INK};
+        {CORNER_TICKS}
+    }}
+
+    /* ---- Dropdowns: crisp, consistent, no baseweb defaults ---- */
     div[data-baseweb="select"] > div {{
-        background-color: {CARD_BG};
-        border-color: {CARD_BORDER};
-        color: {TEXT_DARK};
+        background-color: #ffffff;
+        border: 1.5px solid {INK} !important;
+        border-radius: 2px;
+        color: {INK};
     }}
     div[data-baseweb="select"] * {{
-        color: {TEXT_DARK} !important;
+        color: {INK} !important;
+    }}
+    div[data-baseweb="select"]:focus-within > div {{
+        border-color: {SIGNAL} !important;
+        box-shadow: 0 0 0 1px {SIGNAL};
     }}
     textarea {{
-        color: {TEXT_DARK} !important;
-        background-color: {CARD_BG} !important;
+        color: {INK} !important;
+        background-color: #ffffff !important;
+        border: 1.5px solid {INK} !important;
+        border-radius: 2px !important;
     }}
+
+    /* ---- Buttons ---- */
     .stButton>button, .stFormSubmitButton>button {{
-        background-color: {ACCENT};
-        color: white !important;
-        border-radius: 10px;
-        border: none;
-        padding: 0.6rem 1.4rem;
+        background-color: {SIGNAL};
+        color: #ffffff !important;
+        border-radius: 2px;
+        border: 1.5px solid {INK};
+        padding: 0.65rem 1.4rem;
+        font-family: 'JetBrains Mono', monospace;
         font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 0.85rem;
         width: 100%;
     }}
     .stButton>button:hover, .stFormSubmitButton>button:hover {{
-        background-color: {ACCENT_DARK};
-        color: white !important;
+        background-color: {NAVY};
+        color: #ffffff !important;
+        border-color: {NAVY};
     }}
-    .result-card {{
-        background: {CARD_BG};
-        border-radius: 16px;
-        padding: 1rem;
-        border: 1px solid {CARD_BORDER};
-        box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+
+    /* ---- Info / error banners ---- */
+    div[data-testid="stAlert"] {{
+        border-radius: 2px;
+        border: 1.5px solid {INK};
     }}
-    .info-banner {{
-        background: #eaf2f8;
-        border: 1px solid #cfe3f0;
-        color: {TEXT_DARK};
-        padding: 1rem 1.2rem;
-        border-radius: 12px;
+
+    .caption-mono {{
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.75rem;
+        color: {MUTED};
+        letter-spacing: 0.03em;
     }}
 </style>
 """
@@ -233,16 +322,30 @@ if "history" not in st.session_state:
 
 
 # ----------------------------------------------------------------------
-# Layout
+# Hero
 # ----------------------------------------------------------------------
+DOOR_MARK_SVG = f"""
+<svg width="42" height="42" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M4 4H44" stroke="{SIGNAL}" stroke-width="3" stroke-linecap="round"/>
+  <path d="M4 4V44" stroke="{BLUEPRINT_LINE}" stroke-width="3" stroke-linecap="round"/>
+  <path d="M4 44 H28" stroke="{BLUEPRINT_LINE}" stroke-width="3" stroke-linecap="round"/>
+  <path d="M28 44 A24 24 0 0 0 4 20" stroke="{SIGNAL}" stroke-width="2" stroke-dasharray="3 3" fill="none"/>
+</svg>
+"""
+
 st.markdown(
-    '<div class="hero"><span class="hero-emoji">🏠</span>'
-    '<h1 style="margin:0;">House Interior Generator</h1></div>',
-    unsafe_allow_html=True,
-)
-st.markdown(
-    '<p class="subtitle">Pick your finishes below and generate a realistic preview '
-    'of how the room could look — based on your floor plan.</p>',
+    f'''
+    <div class="hero-band">
+        <div class="hero-left">
+            {DOOR_MARK_SVG}
+            <div>
+                <h1 class="hero-title">House Interior Generator</h1>
+                <p class="hero-sub">Pick your finishes below and render a preview grounded in your floor plan.</p>
+            </div>
+        </div>
+        <div class="hero-scale">SCALE 1:50<br>– – – – – – – –</div>
+    </div>
+    ''',
     unsafe_allow_html=True,
 )
 
@@ -250,20 +353,20 @@ col_form, col_result = st.columns([1, 1.2], gap="large")
 
 with col_form:
     with st.form("interior_form"):
-        st.markdown('<div class="section-label">🚪 Room</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Room</div>', unsafe_allow_html=True)
         room = st.selectbox("Which room are you designing?", ROOMS)
 
-        st.markdown('<div class="section-label">🚪 Door</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Door</div>', unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         door_material = c1.selectbox("Door material", DOOR_MATERIALS)
         door_color = c2.selectbox("Door color", DOOR_COLORS)
 
-        st.markdown('<div class="section-label">🧱 Walls</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Walls</div>', unsafe_allow_html=True)
         c3, c4 = st.columns(2)
         wall_texture = c3.selectbox("Wall texture", WALL_TEXTURES)
         wall_color = c4.selectbox("Wall color", WALL_COLORS)
 
-        st.markdown('<div class="section-label">🎨 Design & Flooring</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Design &amp; flooring</div>', unsafe_allow_html=True)
         c5, c6 = st.columns(2)
         style = c5.selectbox("Overall design style", DESIGN_STYLES)
         accent_color = c6.selectbox("Accent color", ACCENT_COLORS)
@@ -277,50 +380,53 @@ with col_form:
             placeholder="e.g. add a study table, keep it clutter-free, include a balcony view...",
         )
 
-        submitted = st.form_submit_button("✨ Generate Interior")
+        submitted = st.form_submit_button("Render interior ▸")
 
 with col_result:
-    st.subheader("Preview")
+    with st.container(key="preview_card"):
+        st.markdown('<div class="section-label">Preview</div>', unsafe_allow_html=True)
 
-    if submitted:
-        prompt = build_prompt(
-            room, door_material, door_color, wall_texture, wall_color,
-            style, accent_color, flooring, lighting, extra_notes,
-        )
-        with st.spinner("Designing your room..."):
-            try:
-                image_bytes = generate_image(prompt)
-                st.session_state.history.insert(0, {
-                    "image": image_bytes,
-                    "prompt": prompt,
-                    "room": room,
-                    "time": datetime.now().strftime("%H:%M:%S"),
-                })
-            except Exception as e:
-                st.error(f"Couldn't generate the image: {e}")
+        if submitted:
+            prompt = build_prompt(
+                room, door_material, door_color, wall_texture, wall_color,
+                style, accent_color, flooring, lighting, extra_notes,
+            )
+            with st.spinner("Designing your room..."):
+                try:
+                    image_bytes = generate_image(prompt)
+                    st.session_state.history.insert(0, {
+                        "image": image_bytes,
+                        "prompt": prompt,
+                        "room": room,
+                        "time": datetime.now().strftime("%H:%M:%S"),
+                    })
+                except Exception as e:
+                    st.error(f"Couldn't generate the image: {e}")
 
-    if st.session_state.history:
-        latest = st.session_state.history[0]
-        st.markdown('<div class="result-card">', unsafe_allow_html=True)
-        st.image(latest["image"], use_container_width=True, caption=f"{latest['room']} — generated at {latest['time']}")
-        st.download_button(
-            "⬇️ Download image",
-            data=latest["image"],
-            file_name=f"interior_{latest['room'].replace(' ', '_').lower()}.png",
-            mime="image/png",
-        )
-        with st.expander("Show generation prompt"):
-            st.code(latest["prompt"])
-        st.markdown('</div>', unsafe_allow_html=True)
-    else:
-        st.info("Fill in the form and click **Generate Interior** to see a preview here.")
+        if st.session_state.history:
+            latest = st.session_state.history[0]
+            st.image(latest["image"], use_container_width=True)
+            st.markdown(
+                f'<p class="caption-mono">{latest["room"].upper()} — GENERATED {latest["time"]}</p>',
+                unsafe_allow_html=True,
+            )
+            st.download_button(
+                "Download image",
+                data=latest["image"],
+                file_name=f"interior_{latest['room'].replace(' ', '_').lower()}.png",
+                mime="image/png",
+            )
+            with st.expander("Show generation prompt"):
+                st.code(latest["prompt"])
+        else:
+            st.info("Fill in the form and click **Render interior** to see a preview here.")
 
 # ----------------------------------------------------------------------
 # History gallery
 # ----------------------------------------------------------------------
 if len(st.session_state.history) > 1:
     st.divider()
-    st.subheader("Previous generations")
+    st.markdown('<div class="section-label">Previous generations</div>', unsafe_allow_html=True)
     cols = st.columns(4)
     for i, item in enumerate(st.session_state.history[1:9]):
         with cols[i % 4]:
