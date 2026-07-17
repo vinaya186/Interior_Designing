@@ -134,7 +134,14 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 # ----------------------------------------------------------------------
 # Option catalogs (edit/extend these freely)
 # ----------------------------------------------------------------------
-ROOMS = ["Bedroom", "Kitchen / Living Room", "Bathroom"]
+ROOMS = ["Bedroom", "Living Room", "Kitchen", "Bathroom"]
+
+ROOM_FIXTURES = {
+    "Bedroom": "a bed with headboard, bedside tables, and a wardrobe",
+    "Living Room": "a sofa set, coffee table, and a TV unit",
+    "Kitchen": "modular kitchen cabinets, a countertop, and a stove/hob",
+    "Bathroom": "a washbasin, shower area, and toilet fixtures",
+}
 
 DOOR_MATERIALS = ["Wood", "Teak", "Steel", "Glass", "PVC", "Aluminum"]
 DOOR_COLORS = ["Walnut Brown", "Matte Black", "Natural Wood",
@@ -160,9 +167,11 @@ LIGHTING = ["Warm Ambient", "Bright Daylight", "Cozy Dim", "Studio Bright"]
 # ----------------------------------------------------------------------
 def build_prompt(room, door_material, door_color, wall_texture, wall_color,
                   style, accent_color, flooring, lighting, extra_notes):
+    fixtures = ROOM_FIXTURES.get(room, "")
     prompt = (
         f"A photorealistic, professionally photographed interior design render of a {room.lower()} "
         f"in an Indian residential home, following an architectural floor plan layout. "
+        f"The room includes {fixtures}. "
         f"Overall design style: {style}, with {accent_color.lower()} accent tones. "
         f"Walls have a {wall_texture.lower()} finish painted in {wall_color.lower()}. "
         f"Flooring is {flooring.lower()}. "
