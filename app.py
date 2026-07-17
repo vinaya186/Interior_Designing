@@ -26,195 +26,168 @@ from huggingface_hub.errors import HfHubHTTPError
 # ----------------------------------------------------------------------
 st.set_page_config(
     page_title="House Interior Generator",
-    page_icon="📐",
+    page_icon="🏡",
     layout="wide",
 )
 
 # ----------------------------------------------------------------------
-# Design tokens — an architectural "spec sheet" identity: a blueprint-navy
-# hero with a faint drafting grid, crisp paper cards with corner tick marks
-# (like a detail callout on a drawing), and a cyan highlight pulled from
-# blueprint linework rather than a generic accent color.
+# Design tokens — soft pastel palette: lilac-to-blush gradient, white
+# cards with pastel borders and gentle shadows, rounded pill buttons.
 # ----------------------------------------------------------------------
-NAVY = "#0f2a45"
-BLUEPRINT_LINE = "#6fa3c4"
-PAPER = "#f6f5f0"
-INK = "#16212b"
-SIGNAL = "#0e94a3"
-MUTED = "#5c6b75"
+BG_A = "#F6F0FB"       # pale lavender
+BG_B = "#FDF1F4"       # pale blush
+CARD_BG = "#FFFFFF"
+CARD_BORDER = "#EFE1F6"
+INK = "#4A4458"        # soft plum-charcoal (not harsh black)
+MUTED = "#8D8299"
+LILAC = "#C9A9E9"
+PINK = "#F7B8CB"
+MINT = "#AEE7DE"
 
-# Reusable corner-tick "detail callout" marks, drawn with layered
-# background-gradients so no extra markup is needed on the element.
-CORNER_TICKS = f"""
-    background-image:
-        linear-gradient({INK}, {INK}), linear-gradient({INK}, {INK}),
-        linear-gradient({INK}, {INK}), linear-gradient({INK}, {INK}),
-        linear-gradient({INK}, {INK}), linear-gradient({INK}, {INK}),
-        linear-gradient({INK}, {INK}), linear-gradient({INK}, {INK});
-    background-repeat: no-repeat;
-    background-size:
-        16px 2px, 2px 16px,
-        16px 2px, 2px 16px,
-        16px 2px, 2px 16px,
-        16px 2px, 2px 16px;
-    background-position:
-        10px 10px, 10px 10px,
-        calc(100% - 26px) 10px, calc(100% - 12px) 10px,
-        calc(100% - 26px) calc(100% - 12px), calc(100% - 12px) calc(100% - 26px),
-        10px calc(100% - 12px), 10px calc(100% - 26px);
-"""
-
+# NOTE ON HTML STRINGS IN THIS FILE:
+# Every raw-HTML string passed to st.markdown(..., unsafe_allow_html=True)
+# is built with NO leading whitespace on any line. Markdown treats a line
+# indented 4+ spaces as a code block (rendered as literal text) even with
+# unsafe_allow_html=True, which is what caused the "raw HTML tags shown as
+# text" bug — so every block below is written flush-left / concatenated.
 CUSTOM_CSS = f"""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap');
 
-    .stApp {{
-        background-color: {PAPER};
-    }}
-    .stApp, .stApp p, .stApp span, .stApp label, .stApp li {{
-        color: {INK};
-        font-family: 'Inter', sans-serif;
-    }}
-    h1, h2, h3, h4 {{
-        font-family: 'Space Grotesk', sans-serif;
-        color: {INK} !important;
-    }}
+.stApp {{
+background: linear-gradient(160deg, {BG_A} 0%, {BG_B} 100%);
+}}
+.stApp, .stApp p, .stApp span, .stApp label, .stApp li {{
+color: {INK};
+font-family: 'Inter', sans-serif;
+}}
+h1, h2, h3, h4 {{
+font-family: 'Space Grotesk', sans-serif;
+color: {INK} !important;
+}}
 
-    /* ---- Hero band ---- */
-    .hero-band {{
-        background-color: {NAVY};
-        background-image:
-            linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px);
-        background-size: 26px 26px;
-        border-radius: 6px;
-        padding: 2.2rem 2.5rem;
-        margin-bottom: 1.8rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1.5rem;
-        flex-wrap: wrap;
-    }}
-    .hero-left {{
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-    }}
-    .hero-title {{
-        font-family: 'Space Grotesk', sans-serif;
-        font-weight: 700;
-        font-size: 2rem;
-        color: #f6f5f0 !important;
-        margin: 0;
-        line-height: 1.1;
-    }}
-    .hero-sub {{
-        color: {BLUEPRINT_LINE};
-        font-size: 0.95rem;
-        margin: 0.35rem 0 0 0;
-    }}
-    .hero-scale {{
-        font-family: 'JetBrains Mono', monospace;
-        color: {BLUEPRINT_LINE};
-        font-size: 0.75rem;
-        letter-spacing: 0.08em;
-        text-align: right;
-        white-space: nowrap;
-    }}
+.hero-band {{
+position: relative;
+overflow: hidden;
+background: linear-gradient(120deg, {LILAC} 0%, {PINK} 100%);
+border-radius: 28px;
+padding: 2.4rem 2.6rem;
+margin-bottom: 1.8rem;
+display: flex;
+align-items: center;
+gap: 1.2rem;
+}}
+.hero-blob {{
+position: absolute;
+border-radius: 50%;
+background: rgba(255,255,255,0.28);
+}}
+.hero-blob-1 {{ width: 140px; height: 140px; top: -50px; right: 40px; }}
+.hero-blob-2 {{ width: 80px; height: 80px; bottom: -30px; right: 160px; background: rgba(255,255,255,0.18); }}
+.hero-title {{
+font-family: 'Space Grotesk', sans-serif;
+font-weight: 700;
+font-size: 2.1rem;
+color: #ffffff !important;
+margin: 0;
+line-height: 1.15;
+position: relative;
+z-index: 1;
+}}
+.hero-sub {{
+color: #ffffff;
+opacity: 0.92;
+font-size: 0.98rem;
+margin: 0.4rem 0 0 0;
+position: relative;
+z-index: 1;
+}}
 
-    /* ---- Section eyebrows inside the spec sheet ---- */
-    .section-label {{
-        font-family: 'JetBrains Mono', monospace;
-        font-weight: 600;
-        color: {SIGNAL};
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        font-size: 0.75rem;
-        margin: 1.3rem 0 0.5rem 0;
-        padding-bottom: 0.35rem;
-        border-bottom: 1px dashed {BLUEPRINT_LINE};
-    }}
-    .section-label:first-of-type {{
-        margin-top: 0;
-    }}
+.section-pill {{
+display: inline-block;
+font-weight: 700;
+color: {INK};
+text-transform: uppercase;
+letter-spacing: 0.05em;
+font-size: 0.72rem;
+padding: 0.3rem 0.8rem;
+border-radius: 999px;
+margin: 1.1rem 0 0.6rem 0;
+}}
+.pill-lilac {{ background: #EFE1FA; }}
+.pill-pink {{ background: #FDE4EC; }}
+.pill-mint {{ background: #DFF6F1; }}
 
-    /* ---- Spec sheet (form) card ---- */
-    div[data-testid="stForm"] {{
-        background: {PAPER};
-        padding: 1.9rem 2rem 1.5rem 2rem;
-        border-radius: 2px;
-        border: 1.5px solid {INK};
-        {CORNER_TICKS}
-    }}
-    div[data-testid="stForm"] label p {{
-        color: {MUTED} !important;
-        font-weight: 600;
-        font-size: 0.85rem;
-    }}
+div[data-testid="stForm"] {{
+background: {CARD_BG};
+padding: 1.9rem 2.1rem 1.6rem 2.1rem;
+border-radius: 24px;
+border: 1px solid {CARD_BORDER};
+box-shadow: 0 10px 30px rgba(201,169,233,0.18);
+}}
+div[data-testid="stForm"] label p {{
+color: {MUTED} !important;
+font-weight: 600;
+font-size: 0.85rem;
+}}
 
-    /* ---- Preview card (native Streamlit container via key=) ---- */
-    div[class*="st-key-preview_card"] {{
-        background: {PAPER};
-        padding: 1.5rem;
-        border-radius: 2px;
-        border: 1.5px solid {INK};
-        {CORNER_TICKS}
-    }}
+div[class*="st-key-preview_card"] {{
+background: {CARD_BG};
+padding: 1.6rem;
+border-radius: 24px;
+border: 1px solid {CARD_BORDER};
+box-shadow: 0 10px 30px rgba(201,169,233,0.18);
+}}
 
-    /* ---- Dropdowns: crisp, consistent, no baseweb defaults ---- */
-    div[data-baseweb="select"] > div {{
-        background-color: #ffffff;
-        border: 1.5px solid {INK} !important;
-        border-radius: 2px;
-        color: {INK};
-    }}
-    div[data-baseweb="select"] * {{
-        color: {INK} !important;
-    }}
-    div[data-baseweb="select"]:focus-within > div {{
-        border-color: {SIGNAL} !important;
-        box-shadow: 0 0 0 1px {SIGNAL};
-    }}
-    textarea {{
-        color: {INK} !important;
-        background-color: #ffffff !important;
-        border: 1.5px solid {INK} !important;
-        border-radius: 2px !important;
-    }}
+div[data-baseweb="select"] > div {{
+background-color: #FBF7FE;
+border: 1.5px solid {CARD_BORDER} !important;
+border-radius: 14px;
+color: {INK};
+}}
+div[data-baseweb="select"] * {{
+color: {INK} !important;
+}}
+div[data-baseweb="select"]:focus-within > div {{
+border-color: {LILAC} !important;
+box-shadow: 0 0 0 2px rgba(201,169,233,0.35);
+}}
+textarea {{
+color: {INK} !important;
+background-color: #FBF7FE !important;
+border: 1.5px solid {CARD_BORDER} !important;
+border-radius: 14px !important;
+}}
 
-    /* ---- Buttons ---- */
-    .stButton>button, .stFormSubmitButton>button {{
-        background-color: {SIGNAL};
-        color: #ffffff !important;
-        border-radius: 2px;
-        border: 1.5px solid {INK};
-        padding: 0.65rem 1.4rem;
-        font-family: 'JetBrains Mono', monospace;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        font-size: 0.85rem;
-        width: 100%;
-    }}
-    .stButton>button:hover, .stFormSubmitButton>button:hover {{
-        background-color: {NAVY};
-        color: #ffffff !important;
-        border-color: {NAVY};
-    }}
+.stButton>button, .stFormSubmitButton>button {{
+background: linear-gradient(120deg, {LILAC} 0%, {PINK} 100%);
+color: #ffffff !important;
+border-radius: 999px;
+border: none;
+padding: 0.7rem 1.6rem;
+font-family: 'Inter', sans-serif;
+font-weight: 700;
+letter-spacing: 0.02em;
+font-size: 0.9rem;
+width: 100%;
+box-shadow: 0 6px 16px rgba(201,169,233,0.4);
+}}
+.stButton>button:hover, .stFormSubmitButton>button:hover {{
+filter: brightness(1.05);
+color: #ffffff !important;
+}}
 
-    /* ---- Info / error banners ---- */
-    div[data-testid="stAlert"] {{
-        border-radius: 2px;
-        border: 1.5px solid {INK};
-    }}
+div[data-testid="stAlert"] {{
+border-radius: 16px;
+border: 1px solid {CARD_BORDER};
+}}
 
-    .caption-mono {{
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.75rem;
-        color: {MUTED};
-        letter-spacing: 0.03em;
-    }}
+.caption-soft {{
+font-size: 0.8rem;
+color: {MUTED};
+font-weight: 600;
+letter-spacing: 0.02em;
+}}
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -322,51 +295,44 @@ if "history" not in st.session_state:
 
 
 # ----------------------------------------------------------------------
-# Hero
+# Hero — built as one flush-left concatenated string (no indentation)
+# so Markdown never mistakes it for an indented code block.
 # ----------------------------------------------------------------------
-DOOR_MARK_SVG = f"""
-<svg width="42" height="42" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M4 4H44" stroke="{SIGNAL}" stroke-width="3" stroke-linecap="round"/>
-  <path d="M4 4V44" stroke="{BLUEPRINT_LINE}" stroke-width="3" stroke-linecap="round"/>
-  <path d="M4 44 H28" stroke="{BLUEPRINT_LINE}" stroke-width="3" stroke-linecap="round"/>
-  <path d="M28 44 A24 24 0 0 0 4 20" stroke="{SIGNAL}" stroke-width="2" stroke-dasharray="3 3" fill="none"/>
-</svg>
-"""
-
-st.markdown(
-    f'''
-    <div class="hero-band">
-        <div class="hero-left">
-            {DOOR_MARK_SVG}
-            <div>
-                <h1 class="hero-title">House Interior Generator</h1>
-                <p class="hero-sub">Pick your finishes below and render a preview grounded in your floor plan.</p>
-            </div>
-        </div>
-        <div class="hero-scale">SCALE 1:50<br>– – – – – – – –</div>
-    </div>
-    ''',
-    unsafe_allow_html=True,
+hero_html = (
+    '<div class="hero-band">'
+    '<div class="hero-blob hero-blob-1"></div>'
+    '<div class="hero-blob hero-blob-2"></div>'
+    '<div style="position:relative;z-index:1;">'
+    '<h1 class="hero-title">🏡 House Interior Generator</h1>'
+    '<p class="hero-sub">Pick your finishes below and render a preview grounded in your floor plan.</p>'
+    '</div>'
+    '</div>'
 )
+st.markdown(hero_html, unsafe_allow_html=True)
+
+
+def section_pill(text, tone="lilac"):
+    st.markdown(f'<span class="section-pill pill-{tone}">{text}</span>', unsafe_allow_html=True)
+
 
 col_form, col_result = st.columns([1, 1.2], gap="large")
 
 with col_form:
     with st.form("interior_form"):
-        st.markdown('<div class="section-label">Room</div>', unsafe_allow_html=True)
+        section_pill("Room", "lilac")
         room = st.selectbox("Which room are you designing?", ROOMS)
 
-        st.markdown('<div class="section-label">Door</div>', unsafe_allow_html=True)
+        section_pill("Door", "pink")
         c1, c2 = st.columns(2)
         door_material = c1.selectbox("Door material", DOOR_MATERIALS)
         door_color = c2.selectbox("Door color", DOOR_COLORS)
 
-        st.markdown('<div class="section-label">Walls</div>', unsafe_allow_html=True)
+        section_pill("Walls", "mint")
         c3, c4 = st.columns(2)
         wall_texture = c3.selectbox("Wall texture", WALL_TEXTURES)
         wall_color = c4.selectbox("Wall color", WALL_COLORS)
 
-        st.markdown('<div class="section-label">Design &amp; flooring</div>', unsafe_allow_html=True)
+        section_pill("Design &amp; flooring", "lilac")
         c5, c6 = st.columns(2)
         style = c5.selectbox("Overall design style", DESIGN_STYLES)
         accent_color = c6.selectbox("Accent color", ACCENT_COLORS)
@@ -380,11 +346,11 @@ with col_form:
             placeholder="e.g. add a study table, keep it clutter-free, include a balcony view...",
         )
 
-        submitted = st.form_submit_button("Render interior ▸")
+        submitted = st.form_submit_button("✨ Render interior")
 
 with col_result:
     with st.container(key="preview_card"):
-        st.markdown('<div class="section-label">Preview</div>', unsafe_allow_html=True)
+        section_pill("Preview", "pink")
 
         if submitted:
             prompt = build_prompt(
@@ -407,7 +373,7 @@ with col_result:
             latest = st.session_state.history[0]
             st.image(latest["image"], use_container_width=True)
             st.markdown(
-                f'<p class="caption-mono">{latest["room"].upper()} — GENERATED {latest["time"]}</p>',
+                f'<p class="caption-soft">{latest["room"].upper()} · GENERATED {latest["time"]}</p>',
                 unsafe_allow_html=True,
             )
             st.download_button(
@@ -426,7 +392,7 @@ with col_result:
 # ----------------------------------------------------------------------
 if len(st.session_state.history) > 1:
     st.divider()
-    st.markdown('<div class="section-label">Previous generations</div>', unsafe_allow_html=True)
+    section_pill("Previous generations", "lilac")
     cols = st.columns(4)
     for i, item in enumerate(st.session_state.history[1:9]):
         with cols[i % 4]:
