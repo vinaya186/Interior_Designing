@@ -57,7 +57,11 @@ CUSTOM_CSS = f"""
 .stApp {{
 background: linear-gradient(160deg, {BG_A} 0%, {BG_B} 100%);
 }}
-.stApp, .stApp p, .stApp span, .stApp label, .stApp li {{
+.stApp, .stApp p, .stApp label, .stApp li {{
+color: {INK};
+font-family: 'Inter', sans-serif;
+}}
+.stApp span:not([data-testid="stIconMaterial"]) {{
 color: {INK};
 font-family: 'Inter', sans-serif;
 }}
@@ -175,6 +179,43 @@ box-shadow: 0 6px 16px rgba(201,169,233,0.4);
 .stButton>button:hover, .stFormSubmitButton>button:hover {{
 filter: brightness(1.05);
 color: #ffffff !important;
+}}
+
+div[data-testid="stDownloadButton"] button {{
+background: #ffffff;
+color: {INK} !important;
+border-radius: 999px;
+border: 1.5px solid {LILAC};
+padding: 0.6rem 1.4rem;
+font-family: 'Inter', sans-serif;
+font-weight: 700;
+font-size: 0.88rem;
+width: 100%;
+}}
+div[data-testid="stDownloadButton"] button:hover {{
+background: #FBF3FE;
+color: {INK} !important;
+border-color: {PINK};
+}}
+div[data-testid="stDownloadButton"] button span:not([data-testid="stIconMaterial"]) {{
+color: {INK} !important;
+}}
+
+div[data-testid="stExpander"] {{
+background: #ffffff;
+border: 1px solid {CARD_BORDER};
+border-radius: 16px;
+overflow: hidden;
+}}
+div[data-testid="stExpander"] summary {{
+color: {INK} !important;
+font-weight: 600;
+}}
+div[data-testid="stExpander"] summary span:not([data-testid="stIconMaterial"]) {{
+color: {INK} !important;
+}}
+div[data-testid="stExpander"] p {{
+color: {INK} !important;
 }}
 
 div[data-testid="stAlert"] {{
